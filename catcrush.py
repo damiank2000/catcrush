@@ -73,7 +73,9 @@ class Block:
 
     isMatched = False
     isGone = False
+    isFalling = False
     sizepercentage = 100
+    fallCount = 0
     
     def __init__(self, colour):
         self.colour = colour
@@ -81,11 +83,20 @@ class Block:
     def match(self):
         self.isMatched = True
 
+    def fall(self):
+        self.isFalling = True
+        self.fallCount = 100
+
     def animate(self):
         if self.isMatched and self.colour != 'NONE' and self.sizepercentage > 0:
             self.sizepercentage = self.sizepercentage + 20
         if self.sizepercentage >= 200:
             self.isGone = True
+        if self.isFalling:
+            self.fallCount = self.fallCount - 20
+            if self.fallCount <= 0:
+                self.isFalling = False
+                self.isFalling = 0
 
 class Grid:
     '''Represents a grid of colour blocks'''
@@ -105,7 +116,8 @@ class Grid:
 
     def canMatch(self, row, column):
         return not self.blocks[row][column] is None \
-               and self.blocks[row][column].isMatched == False
+               and self.blocks[row][column].isMatched == False \
+               and self.blocks[row][column].isFalling == False
 
     def matchesColour(self, row, column, colour):
         return not self.blocks[row][column] is None \
@@ -140,7 +152,12 @@ class Grid:
         return matches
 
     def anyMatches(self):
-        return len(self.matches) > 0
+        return len(self.getMatches()) > 0
+
+    def clear(self):
+        for rowIndex in range(0, self.rows):
+            for columnIndex in range(0, self.columns):
+                self.blocks[rowIndex][columnIndex] = None
 
 # set up environment    
 pygame.init()
@@ -160,29 +177,13 @@ selected = None
 swap = None
 phraseCounter = 0
 phrase = ''
+turns = 20
+gameOver = False
 
 # main game loop
 while not done:
-    
-    # respond to events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
-        if event.type == pygame.MOUSEBUTTONUP:
-            position = pygame.mouse.get_pos()
-            row = int((position[1] - 30) / 60)
-            column = int((position[0] - 30) / 60)
-            if not selected is None \
-               and ((abs(row - selected[0]) == 1 and abs(column - selected[1]) == 0) \
-                    or (abs(row - selected[0]) == 0 and abs(column - selected[1]) == 1)):
-               swap = (row, column)
-            else: 
-                selected = (row, column)
-                swap = None
-            print(selected)
 
     # draw screen
-    pygame.display.flip()
     for rowIndex in range(0, grid.rows):
         for columnIndex in range(0, grid.columns):
             block = grid.blocks[rowIndex][columnIndex]
@@ -192,17 +193,17 @@ while not done:
             if not block is None:
                 block.animate()
                 size = 56
-                offset = 0
-                offset = (60 - size) / 2
+                xoffset = (60 - size) / 2
+                yoffset = ((60 - size) / 2) - (60 * block.fallCount / 100)
                 colour=COLOURS[block.colour]
-                pygame.draw.rect(screen, colour, pygame.Rect(x+offset, y+offset, size, size))
+                pygame.draw.rect(screen, colour, pygame.Rect(x+xoffset, y+yoffset, size, size))
                 image = IMAGES[block.colour]
-                screen.blit(get_image(image, (54, 54)), (x+3, y+3))
+                screen.blit(get_image(image, (54, 54)), (x+xoffset+1, y+yoffset+1))
 
                 if selected == (rowIndex, columnIndex):
-                    pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(x+offset, y+offset, size, size))
+                    pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(x+xoffset, y+yoffset, size, size))
                 elif swap == (rowIndex, columnIndex):
-                    pygame.draw.rect(screen, (200, 200, 200), pygame.Rect(x+offset, y+offset, size, size))
+                    pygame.draw.rect(screen, (200, 200, 200), pygame.Rect(x+xoffset, y+yoffset, size, size))
 
     # draw grumpy cat
     phraseCounter += 1
@@ -215,9 +216,68 @@ while not done:
     screen.blit(textSurface, (100, 450))
 
     # draw score
-    pygame.draw.rect(screen, 0, pygame.Rect(500, 450, 200, 200))
+    pygame.draw.rect(screen, 0, pygame.Rect(500, 400, 300, 200))
     textSurface = myfont.render('SCORE: ' + str(score), False, (250, 250, 250))
+    screen.blit(textSurface, (550, 400))
+    pygame.draw.rect(screen, 0, pygame.Rect(500, 450, 300, 200))
+    textSurface = myfont.render('TURNS: ' + str(turns), False, (250, 250, 250))
     screen.blit(textSurface, (550, 450))
+
+    # draw controls
+    resetButton = pygame.Rect(550, 500, 110, 40)
+    pygame.draw.rect(screen, (50, 50, 50), resetButton)
+    textSurface = myfont.render('RESTART', False, (250, 250, 250))
+    screen.blit(textSurface, (550, 500))
+
+    # blank out top
+    pygame.draw.rect(screen, 0, pygame.Rect(0, 0, 800, 30))
+
+    # flip the display buffer
+    pygame.display.flip()
+        
+    # respond to events
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            done = True
+        if event.type == pygame.MOUSEBUTTONUP:
+            position = pygame.mouse.get_pos()
+            if resetButton.collidepoint(position):
+                grid.clear()
+                done = False
+                score = 0
+                allowMatch = True
+                selected = None
+                swap = None
+                phraseCounter = 0
+                phrase = ''
+                turns = 20
+                gameOver = False
+            elif not gameOver:
+                row = int((position[1] - 30) / 60)
+                column = int((position[0] - 30) / 60)
+                if not selected is None \
+                   and ((abs(row - selected[0]) == 1 and abs(column - selected[1]) == 0) \
+                        or (abs(row - selected[0]) == 0 and abs(column - selected[1]) == 1)):
+                   swap = (row, column)
+                else: 
+                    selected = (row, column)
+                    swap = None
+
+    # apply gravity
+    for rowIndex in range(grid.rows - 2, -1, -1):
+        for columnIndex in range(0, grid.columns):
+            if grid.canMatch(rowIndex, columnIndex) \
+                and grid.blocks[rowIndex+1][columnIndex] is None:
+                    print("("+str(rowIndex)+","+str(columnIndex)+") falling")
+                    grid.blocks[rowIndex][columnIndex].fall()
+                    grid.blocks[rowIndex+1][columnIndex] = grid.blocks[rowIndex][columnIndex]
+                    grid.blocks[rowIndex][columnIndex] = None
+
+    # bring in new blocks from the top
+    for columnIndex in range(0, grid.columns):
+        if grid.blocks[0][columnIndex] is None:
+            grid.blocks[0][columnIndex] = Block(random_colour())
+            grid.blocks[0][columnIndex].fall()
 
     # check for matches
     if allowMatch == True:
@@ -236,20 +296,10 @@ while not done:
                 print("("+str(rowIndex)+","+str(columnIndex)+") removed")
                 grid.blocks[rowIndex][columnIndex] = None
 
-    # apply gravity
-    for rowIndex in range(grid.rows - 2, -1, -1):
-        for columnIndex in range(0, grid.columns):
-            if grid.canMatch(rowIndex, columnIndex) \
-                and grid.blocks[rowIndex+1][columnIndex] is None:
-                    print("("+str(rowIndex)+","+str(columnIndex)+") falling")
-                    grid.blocks[rowIndex+1][columnIndex] = grid.blocks[rowIndex][columnIndex]
-                    grid.blocks[rowIndex][columnIndex] = None
-
-    # bring in new blocks from the top
-    for columnIndex in range(0, grid.columns):
-        if grid.blocks[0][columnIndex] is None:
-            grid.blocks[0][columnIndex] = Block(random_colour())
-
+    # check number of turns
+    if turns == 0:
+        gameOver= True
+        
     # perform the requested block swap if there is one
     if selected is not None and swap is not None:
         sourceBlock = grid.blocks[selected[0]][selected[1]]
@@ -258,17 +308,18 @@ while not done:
         grid.blocks[swap[0]][swap[1]] = sourceBlock
         print('Swapped ' + str(selected) + ' and ' + str(swap))
 
-        if grid.anyMatches():
+        if not grid.anyMatches():
             sourceBlock = grid.blocks[selected[0]][selected[1]]
             swapBlock = grid.blocks[swap[0]][swap[1]]
             grid.blocks[selected[0]][selected[1]] = swapBlock
             grid.blocks[swap[0]][swap[1]] = sourceBlock
             print('Swapped back ' + str(selected) + ' and ' + str(swap))
         else:
-            meow.play()
+            turns = turns - 1
+            #meow.play()
             
         selected = None
-        swap = None
+        swap = None    
         
     clock.tick(60)
     
