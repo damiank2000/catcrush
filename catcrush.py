@@ -54,7 +54,7 @@ def get_image(path, scale):
     global _image_library
     scaled_image = _image_library.get(path)
     if scaled_image == None:
-        full_path='/home/Ellie/' + path
+        full_path = rootFolder + path
         canonicalized_path = full_path.replace('/', os.sep)
         image = pygame.image.load(canonicalized_path)
         scaled_image = pygame.transform.scale(image, (scale[0], scale[1]))
@@ -132,21 +132,30 @@ class Grid:
                         matches.append(self.blocks[rowIndex+1][columnIndex])
         return matches
 
-    
+    def anyMatches(self):
+        return len(self.matches) > 0
+
+# set up environment    
 pygame.init()
 pygame.font.init()
 screen = pygame.display.set_mode((800, 600))
 clock = pygame.time.Clock()
-grid = Grid(6, 12)
-meow = load_sound("cat.wav", '/home/Ellie/')
+rootFolder = '/home/Ellie/Development/catcrush/'
+meow = load_sound("cat.wav", rootFolder)
 myfont = pygame.font.SysFont('AlphaFridgeMagnets', 30)
 
+# start new game
+grid = Grid(6, 12)
 done = False
 score = 0
 allowMatch = True
 selected = None
 swap = None
+
+# main game loop
 while not done:
+    
+    # respond to events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             done = True
@@ -163,8 +172,8 @@ while not done:
                 swap = None
             print(selected)
 
+    # draw screen
     pygame.display.flip()
-
     for rowIndex in range(0, grid.rows):
         for columnIndex in range(0, grid.columns):
             block = grid.blocks[rowIndex][columnIndex]
@@ -194,8 +203,9 @@ while not done:
     # draw score
     pygame.draw.rect(screen, 0, pygame.Rect(500, 450, 200, 200))
     textSurface = myfont.render('SCORE: ' + str(score), False, (250, 250, 250))
-    screen.blit(textSurface, (500, 450))
+    screen.blit(textSurface, (550, 450))
 
+    # check for matches
     if allowMatch == True:
         matches = grid.getMatches()
         for match in matches:
@@ -204,6 +214,7 @@ while not done:
             print("score is " + str(score))
             match.match()
 
+    # remove blocks where removal animation has finished
     for rowIndex in range(0, grid.rows):
         for columnIndex in range(0, grid.columns):
             if not grid.blocks[rowIndex][columnIndex] is None \
@@ -211,6 +222,7 @@ while not done:
                 print("("+str(rowIndex)+","+str(columnIndex)+") removed")
                 grid.blocks[rowIndex][columnIndex] = None
 
+    # apply gravity
     for rowIndex in range(grid.rows - 2, -1, -1):
         for columnIndex in range(0, grid.columns):
             if grid.canMatch(rowIndex, columnIndex) \
@@ -219,10 +231,12 @@ while not done:
                     grid.blocks[rowIndex+1][columnIndex] = grid.blocks[rowIndex][columnIndex]
                     grid.blocks[rowIndex][columnIndex] = None
 
+    # bring in new blocks from the top
     for columnIndex in range(0, grid.columns):
         if grid.blocks[0][columnIndex] is None:
             grid.blocks[0][columnIndex] = Block(random_colour())
 
+    # perform the requested block swap if there is one
     if selected is not None and swap is not None:
         sourceBlock = grid.blocks[selected[0]][selected[1]]
         swapBlock = grid.blocks[swap[0]][swap[1]]
@@ -230,7 +244,7 @@ while not done:
         grid.blocks[swap[0]][swap[1]] = sourceBlock
         print('Swapped ' + str(selected) + ' and ' + str(swap))
 
-        if len(grid.getMatches()) == 0:
+        if grid.anyMatches():
             sourceBlock = grid.blocks[selected[0]][selected[1]]
             swapBlock = grid.blocks[swap[0]][swap[1]]
             grid.blocks[selected[0]][selected[1]] = swapBlock
@@ -241,6 +255,7 @@ while not done:
             
         selected = None
         swap = None
+        
     clock.tick(60)
     
 meow()
