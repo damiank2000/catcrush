@@ -34,6 +34,13 @@ IMAGES = {
     'MAGENTA':'cat6.jpg'
     }
 
+PHRASES = [
+    '',
+    'GIVE ME FUDZ',
+    'I WANT CANDY NOT',
+    'BAD KITTY'
+    ]
+
 def load_sound(sound_filename, directory):
     fullname = os.path.join(directory, sound_filename)
     sound = pygame.mixer.Sound(fullname)
@@ -151,6 +158,8 @@ score = 0
 allowMatch = True
 selected = None
 swap = None
+phraseCounter = 0
+phrase = ''
 
 # main game loop
 while not done:
@@ -195,9 +204,14 @@ while not done:
                 elif swap == (rowIndex, columnIndex):
                     pygame.draw.rect(screen, (200, 200, 200), pygame.Rect(x+offset, y+offset, size, size))
 
-    # draw grumpy cat            
+    # draw grumpy cat
+    phraseCounter += 1
+    if phraseCounter == 500:
+        phrase = random.choice(PHRASES)
+        phraseCounter = 0
+        pygame.draw.rect(screen, 0, pygame.Rect(100, 450, 200, 200))
     screen.blit(get_image("grumpycat.jpg", (200, 160)), (300, 400))           
-    textSurface = myfont.render('GIVE ME FUDZ', False, (250, 250, 250))
+    textSurface = myfont.render(phrase, False, (250, 250, 250))
     screen.blit(textSurface, (100, 450))
 
     # draw score
