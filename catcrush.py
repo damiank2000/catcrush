@@ -99,6 +99,47 @@ class Block:
                 self.isFalling = False
                 self.isFalling = 0
 
+class TextButton:
+    '''Simple text button'''
+
+    def __init__(self, text, position, size):
+        self.text = text
+        self.position = position
+        self.size = size
+        self.rect = pygame.Rect(position, size)
+
+    def collidepoint(self, point):
+        return self.rect.collidepoint(point)        
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, (150, 150, 150), self.rect)
+        textSurface = myfont.render(self.text, False, (250, 250, 250))
+        screen.blit(textSurface, self.position)
+
+class GraphicalToggleButton:
+    '''Simple graphical toggle button'''
+
+    def __init__(self, imageOn, imageOff, position, size):
+        self.imageOn = getImage(imageOn, size)
+        self.imageOff = getImage(imageOff, size)
+        self.position = position
+        self.size = size
+        self.rect = pygame.Rect(position, size)
+        self.on = True
+
+    def collidepoint(self, point):
+        if self.rect.collidepoint(point):
+            self.on = not self.on
+            return True
+        return False
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, (150, 150, 150), self.rect)
+        if self.on == True:
+            screen.blit(self.imageOn, self.position)
+        else:
+            screen.blit(self.imageOff, self.position)
+        
 class Grid:
     '''Represents a grid of colour blocks'''
 
@@ -160,14 +201,27 @@ class Grid:
             for columnIndex in range(0, self.columns):
                 self.blocks[rowIndex][columnIndex] = None
 
+    def inBounds(self, position):
+        return position[0] >= 0 \
+               and position[0] <= self.rows \
+               and position[1] >= 0 \
+               and position[1] <= self.columns
+
+def meow():
+    if sound == True:
+        meowSound.play()
+
 # set up environment    
 pygame.init()
 pygame.font.init()
 screen = pygame.display.set_mode((800, 600))
 clock = pygame.time.Clock()
 rootFolder = './'
-meow = load_sound("cat.wav", rootFolder)
+meowSound = load_sound("cat.wav", rootFolder)
 myfont = pygame.font.SysFont('AlphaFridgeMagnets', 30)
+sound = True
+restartButton = TextButton('RESTART', (550, 500), (110, 40))
+soundToggleButton = GraphicalToggleButton('sound_on.png', 'sound_off.png', (700, 500), (40, 40))
 
 # start new game
 grid = Grid(6, 12)
@@ -226,10 +280,8 @@ while not done:
     screen.blit(textSurface, (550, 450))
 
     # draw controls
-    resetButton = pygame.Rect(550, 500, 110, 40)
-    pygame.draw.rect(screen, (50, 50, 50), resetButton)
-    textSurface = myfont.render('RESTART', False, (250, 250, 250))
-    screen.blit(textSurface, (550, 500))
+    restartButton.draw(screen)
+    soundToggleButton.draw(screen)
 
     # blank out top
     pygame.draw.rect(screen, 0, pygame.Rect(0, 0, 800, 30))
@@ -243,7 +295,7 @@ while not done:
             done = True
         if event.type == pygame.MOUSEBUTTONUP:
             position = pygame.mouse.get_pos()
-            if resetButton.collidepoint(position):
+            if restartButton.collidepoint(position):
                 grid.clear()
                 done = False
                 score = 0
@@ -255,14 +307,17 @@ while not done:
                 turns = 20
                 gameOver = False
                 matchCount = 0
+            elif soundToggleButton.collidepoint(position):
+                sound = soundToggleButton.on
             elif not gameOver:
                 row = int((position[1] - 30) / 60)
                 column = int((position[0] - 30) / 60)
                 if not selected is None \
+                   and grid.inBounds((row, column)) \
                    and ((abs(row - selected[0]) == 1 and abs(column - selected[1]) == 0) \
                         or (abs(row - selected[0]) == 0 and abs(column - selected[1]) == 1)):
                    swap = (row, column)
-                else: 
+                elif grid.inBounds((row, column)): 
                     selected = (row, column)
                     swap = None
 
@@ -318,6 +373,7 @@ while not done:
                         if grid.blocks[rowIndex][columnIndex].blockType == targetBlockType:
                             grid.blocks[rowIndex][columnIndex].match()
             turns = turns - 1
+            meow()
         else:
             # try a swap
             grid.blocks[selected[0]][selected[1]] = swapBlock
@@ -333,7 +389,7 @@ while not done:
                 # match
                 turns = turns - 1
                 matchCount += 1
-                meow.play()
+                meow()
             
         selected = None
         swap = None    
