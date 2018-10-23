@@ -41,7 +41,7 @@ IMAGES = {
     }
 
 PHRASES = [
-    '',
+    #'',
     'GIVE ME FUDZ',
     'I WANT CANDY NOT',
     'BAD KITTY',
@@ -235,6 +235,8 @@ class Game:
         self.matchCount = 0
         self.fishServed = False
         self.chickenServed = False
+        self.isEatingChicken = False
+        self.eatChickenTimer = 0
 
     def tick(self):
         self.phraseCounter += 1
@@ -244,6 +246,11 @@ class Game:
             else:
                 self.phrase = random.choice(PHRASES)
                 self.phraseCounter = 0
+        if self.eatChickenTimer > 0:
+            self.eatChickenTimer -= 1
+        elif self.isEatingChicken == True:
+            self.isEatingChicken = False
+            self.setPhrase('')
 
     def isTimeToServeFish(self):
         return self.matchCount == 10 and not self.fishServed
@@ -256,12 +263,18 @@ class Game:
         self.fishServed = True
         
     def serveChicken(self):
-        self.setPhrase('NOM NOM NOM')
+        self.setPhrase('GIVE CHICKEN NOWS!!1')
         self.chickenServed = True
         
     def setPhrase(self, phrase):
+        print(phrase)
         self.phrase = phrase
         self.phraseCounter = 0
+
+    def eatChicken(self):
+        self.isEatingChicken = True
+        self.eatChickenTimer = 50
+        self.setPhrase('NOM NOM NOM')
 
 def meow():
     if sound == True:
@@ -288,6 +301,7 @@ game.reset()
 while not game.done:
 
     # draw screen
+    screen.fill(0)
     for rowIndex in range(0, grid.rows):
         for columnIndex in range(0, grid.columns):
             block = grid.blocks[rowIndex][columnIndex]
@@ -313,11 +327,19 @@ while not game.done:
     game.tick()
 
     # draw grumpy cat
-    pygame.draw.rect(screen, 0, pygame.Rect(100, 450, 200, 200))
-    screen.blit(getImage("grumpycat.jpg", (200, 160)), (300, 400))
-    textSurface = myfont.render(game.phrase, False, (250, 250, 250))
-    screen.blit(textSurface, (100, 450))
+    if game.isEatingChicken == True:
+        grumpyCatPosition = (300, 200)
+        speechPosition = (100, 250)
+    else:
+        grumpyCatPosition = (300, 400)
+        speechPosition = (100, 450)
+    screen.blit(getImage("grumpycat.jpg", (200, 160)), grumpyCatPosition)
+    if len(game.phrase) > 0:
+        pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(speechPosition, (18*len(game.phrase), 40)))
+        textSurface = myfont.render(game.phrase, False, (0, 0, 0))
+        screen.blit(textSurface, speechPosition)
 
+        
     # draw score
     pygame.draw.rect(screen, 0, pygame.Rect(500, 400, 300, 200))
     textSurface = myfont.render('SCORE: ' + str(game.score), False, (250, 250, 250))
@@ -400,39 +422,50 @@ while not game.done:
         game.gameOver= True
         
     # perform the requested block swap if there is one
-    if game.selected is not None and game.swap is not None:
+    if game.selected is not None:
         sourceBlock = grid.blocks[game.selected[0]][game.selected[1]]
-        swapBlock = grid.blocks[game.swap[0]][game.swap[1]]
-        if sourceBlock.blockType == 'FISH':
-            sourceBlock.match()
-            targetBlockType = swapBlock.blockType
-            for rowIndex in range(0, grid.rows):
-                for columnIndex in range(0, grid.columns):
-                    if grid.canMatch(rowIndex, columnIndex):
-                        if grid.blocks[rowIndex][columnIndex].blockType == targetBlockType:
-                            grid.blocks[rowIndex][columnIndex].match()
+        if sourceBlock.blockType == 'CHICKEN':
+            for rowIndex in range(max(game.selected[0]-1, 0), game.selected[0]+2):
+                for columnIndex in range(max(game.selected[1]-1, 0), game.selected[1]+2):
+                    grid.blocks[rowIndex][columnIndex].match()
             game.turns = game.turns - 1
             game.matchCount += 1
+            game.selected = None
+            game.swap = None
+            game.eatChicken()
             meow()
-        else:
-            # try a swap
-            grid.blocks[game.selected[0]][game.selected[1]] = swapBlock
-            grid.blocks[game.swap[0]][game.swap[1]] = sourceBlock
-
-            if not grid.anyMatches():
-                # no match, swap back
-                sourceBlock = grid.blocks[game.selected[0]][game.selected[1]]
-                swapBlock = grid.blocks[game.swap[0]][game.swap[1]]
-                grid.blocks[game.selected[0]][game.selected[1]] = swapBlock
-                grid.blocks[game.swap[0]][game.swap[1]] = sourceBlock
-            else:
-                # match
+        elif game.swap is not None:
+            swapBlock = grid.blocks[game.swap[0]][game.swap[1]]
+            if sourceBlock.blockType == 'FISH':
+                sourceBlock.match()
+                targetBlockType = swapBlock.blockType
+                for rowIndex in range(0, grid.rows):
+                    for columnIndex in range(0, grid.columns):
+                        if grid.canMatch(rowIndex, columnIndex):
+                            if grid.blocks[rowIndex][columnIndex].blockType == targetBlockType:
+                                grid.blocks[rowIndex][columnIndex].match()
                 game.turns = game.turns - 1
                 game.matchCount += 1
                 meow()
-            
-        game.selected = None
-        game.swap = None    
+            else:
+                # try a swap
+                grid.blocks[game.selected[0]][game.selected[1]] = swapBlock
+                grid.blocks[game.swap[0]][game.swap[1]] = sourceBlock
+
+                if not grid.anyMatches():
+                    # no match, swap back
+                    sourceBlock = grid.blocks[game.selected[0]][game.selected[1]]
+                    swapBlock = grid.blocks[game.swap[0]][game.swap[1]]
+                    grid.blocks[game.selected[0]][game.selected[1]] = swapBlock
+                    grid.blocks[game.swap[0]][game.swap[1]] = sourceBlock
+                else:
+                    # match
+                    game.turns = game.turns - 1
+                    game.matchCount += 1
+                    meow()
+                
+            game.selected = None
+            game.swap = None    
         
     clock.tick(60)
     
