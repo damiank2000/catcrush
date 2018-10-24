@@ -84,7 +84,7 @@ class Block:
     isMatched = False
     isGone = False
     isFalling = False
-    sizepercentage = 100
+    animationFrame = 1
     fallCount = 0
     
     def __init__(self, blockType):
@@ -99,8 +99,8 @@ class Block:
 
     def animate(self):
         if self.isMatched and not self.isGone:
-            self.sizepercentage = self.sizepercentage + 20
-        if self.sizepercentage >= 200:
+            self.animationFrame = self.animationFrame + 1
+        if self.animationFrame >= 5:
             self.isGone = True
         if self.isFalling:
             self.fallCount = self.fallCount - 20
@@ -169,6 +169,26 @@ class Grid:
         return not self.blocks[row][column] is None \
                and self.blocks[row][column].isMatched == False \
                and self.blocks[row][column].isFalling == False
+
+    def getBlock(self, position):
+        return self.blocks[position[0]][position[1]]
+
+    def setBlock(self, position, block):
+        self.blocks[position[0]][position[1]] = block
+
+    def moveBlock(self, sourcePosition, targetPosition):
+        block = self.getBlock(sourcePosition)
+        self.setBlock(targetPosition, block)
+        self.setBlock(sourcePosition, None)
+
+    def swapBlocks(self, sourcePosition, swapPosition):
+        sourceBlock = self.getBlock(sourcePosition)
+        swapBlock = self.getBlock(swapPosition)
+        self.setBlock(sourcePosition, swapBlock)
+        self.setBlock(swapPosition, sourceBlock)
+
+    def removeBlock(self, position):
+        self.setBlock(position, None)
 
     def matchesBlockType(self, row, column, blockType):
         return not self.blocks[row][column] is None \
@@ -304,24 +324,26 @@ while not game.done:
     screen.fill(0)
     for rowIndex in range(0, grid.rows):
         for columnIndex in range(0, grid.columns):
-            block = grid.blocks[rowIndex][columnIndex]
+            block = grid.getBlock((rowIndex, columnIndex))
             x = 30+(columnIndex*60)
             y = 30+(rowIndex*60)
             pygame.draw.rect(screen, 0, pygame.Rect(x, y, 60, 60))
             if not block is None:
                 block.animate()
-                size = 56
-                xoffset = (60 - size) / 2
-                yoffset = ((60 - size) / 2) - (60 * block.fallCount / 100)
+                blockSize = 60 - ((block.animationFrame - 1) * 10)
+                frameSize = blockSize - 4
+                imageSize = blockSize - 6
+                xoffset = (blockSize - frameSize) / 2
+                yoffset = ((blockSize - frameSize) / 2) - (60 * block.fallCount / 100)
                 colour=COLOURS[block.blockType]
-                pygame.draw.rect(screen, colour, pygame.Rect(x+xoffset, y+yoffset, size, size))
+                pygame.draw.rect(screen, colour, pygame.Rect(x+xoffset, y+yoffset, frameSize, frameSize))
                 image = IMAGES[block.blockType]
-                screen.blit(getImage(image, (54, 54)), (x+xoffset+1, y+yoffset+1))
+                screen.blit(getImage(image, (imageSize, imageSize)), (x+xoffset+1, y+yoffset+1))
 
                 if game.selected == (rowIndex, columnIndex):
-                    pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(x+xoffset, y+yoffset, size, size))
+                    pygame.draw.rect(screen, (255, 255, 255, 100), pygame.Rect(x+xoffset, y+yoffset, frameSize, frameSize))
                 elif game.swap == (rowIndex, columnIndex):
-                    pygame.draw.rect(screen, (200, 200, 200), pygame.Rect(x+xoffset, y+yoffset, size, size))
+                    pygame.draw.rect(screen, (200, 200, 200, 100), pygame.Rect(x+xoffset, y+yoffset, frameSize, frameSize))
 
 
     game.tick()
@@ -352,9 +374,6 @@ while not game.done:
     restartButton.draw(screen)
     soundToggleButton.draw(screen)
 
-    # blank out top
-    pygame.draw.rect(screen, 0, pygame.Rect(0, 0, 800, 30))
-
     # flip the display buffer
     pygame.display.flip()
         
@@ -384,24 +403,23 @@ while not game.done:
     # apply gravity
     for rowIndex in range(grid.rows - 2, -1, -1):
         for columnIndex in range(0, grid.columns):
-            if grid.canMatch(rowIndex, columnIndex) \
-                and grid.blocks[rowIndex+1][columnIndex] is None:
-                    grid.blocks[rowIndex][columnIndex].fall()
-                    grid.blocks[rowIndex+1][columnIndex] = grid.blocks[rowIndex][columnIndex]
-                    grid.blocks[rowIndex][columnIndex] = None
+            if grid.canMatch(rowIndex, columnIndex) and grid.getBlock((rowIndex+1, columnIndex)) is None:
+                grid.getBlock((rowIndex, columnIndex)).fall()
+                grid.moveBlock((rowIndex, columnIndex), (rowIndex+1, columnIndex))
 
     # bring in new blocks from the top
     for columnIndex in range(0, grid.columns):
-        if grid.blocks[0][columnIndex] is None:
+        if grid.getBlock((0, columnIndex)) is None:
             if game.isTimeToServeFish():
-                grid.blocks[0][columnIndex] = Block('FISH')
+                newBlock = Block('FISH')
                 game.serveFish()
             elif game.isTimeToServeChicken():
-                grid.blocks[0][columnIndex] = Block('CHICKEN')
+                newBlock = Block('CHICKEN')
                 game.serveChicken()
             else:    
-                grid.blocks[0][columnIndex] = Block(getRandomBlockType())
-            grid.blocks[0][columnIndex].fall()
+                newBlock = Block(getRandomBlockType())
+            grid.setBlock((0, columnIndex), newBlock)
+            newBlock.fall()
 
     # check for matches
     if game.allowMatch == True:
@@ -413,9 +431,9 @@ while not game.done:
     # remove blocks where removal animation has finished
     for rowIndex in range(0, grid.rows):
         for columnIndex in range(0, grid.columns):
-            if not grid.blocks[rowIndex][columnIndex] is None \
-                and grid.blocks[rowIndex][columnIndex].isGone == True:
-                grid.blocks[rowIndex][columnIndex] = None
+            block = grid.getBlock((rowIndex, columnIndex))
+            if not block is None and block.isGone == True:
+                grid.removeBlock((rowIndex, columnIndex))
 
     # check number of turns
     if game.turns == 0:
@@ -423,7 +441,7 @@ while not game.done:
         
     # perform the requested block swap if there is one
     if game.selected is not None:
-        sourceBlock = grid.blocks[game.selected[0]][game.selected[1]]
+        sourceBlock = grid.getBlock(game.selected)
         if sourceBlock.blockType == 'CHICKEN':
             for rowIndex in range(max(game.selected[0]-1, 0), game.selected[0]+2):
                 for columnIndex in range(max(game.selected[1]-1, 0), game.selected[1]+2):
@@ -435,29 +453,24 @@ while not game.done:
             game.eatChicken()
             meow()
         elif game.swap is not None:
-            swapBlock = grid.blocks[game.swap[0]][game.swap[1]]
+            swapBlock = grid.getBlock(game.swap)
             if sourceBlock.blockType == 'FISH':
                 sourceBlock.match()
                 targetBlockType = swapBlock.blockType
                 for rowIndex in range(0, grid.rows):
                     for columnIndex in range(0, grid.columns):
                         if grid.canMatch(rowIndex, columnIndex):
-                            if grid.blocks[rowIndex][columnIndex].blockType == targetBlockType:
-                                grid.blocks[rowIndex][columnIndex].match()
+                            if grid.getBlock((rowIndex, columnIndex)).blockType == targetBlockType:
+                                grid.getBlock((rowIndex, columnIndex)).match()
                 game.turns = game.turns - 1
                 game.matchCount += 1
                 meow()
             else:
                 # try a swap
-                grid.blocks[game.selected[0]][game.selected[1]] = swapBlock
-                grid.blocks[game.swap[0]][game.swap[1]] = sourceBlock
-
+                grid.swapBlocks(game.selected, game.swap)
                 if not grid.anyMatches():
                     # no match, swap back
-                    sourceBlock = grid.blocks[game.selected[0]][game.selected[1]]
-                    swapBlock = grid.blocks[game.swap[0]][game.swap[1]]
-                    grid.blocks[game.selected[0]][game.selected[1]] = swapBlock
-                    grid.blocks[game.swap[0]][game.swap[1]] = sourceBlock
+                    grid.swapBlocks(game.selected, game.swap)
                 else:
                     # match
                     game.turns = game.turns - 1
