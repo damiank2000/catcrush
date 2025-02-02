@@ -97,6 +97,14 @@ class Block:
         self.isFalling = True
         self.fallCount = 100
 
+    def isMatchable(self):
+        return not self.isMatched and not self.isFalling
+    
+    def matches(self, block):
+        return block \
+               and block.isMatchable() \
+               and block.blockType == block.blockType
+
     def animate(self):
         if self.isMatched and not self.isGone:
             self.animationFrame = self.animationFrame + 1
@@ -165,10 +173,9 @@ class Grid:
                 blockrow.append(Block(getRandomBlockType()))
             self.blocks.append(blockrow)
 
-    def canMatch(self, row, column):
+    def isMatchable(self, row, column):
         return not self.blocks[row][column] is None \
-               and self.blocks[row][column].isMatched == False \
-               and self.blocks[row][column].isFalling == False
+               and self.blocks[row][column].isMatchable
 
     def getBlock(self, position):
         return self.blocks[position[0]][position[1]]
@@ -194,32 +201,33 @@ class Grid:
         return not self.blocks[row][column] is None \
                and self.blocks[row][column].blockType == blockType
 
+    def isMatchingBlock(self, row, column, block):
+        blockAtLocation = self.blocks[row][column]
+        return blockAtLocation \
+               and blockAtLocation.isMatchable() \
+               and blockAtLocation.blockType == block.blockType
+
     def getMatches(self):
         matches = []
         for rowIndex in range(0, self.rows):
             for columnIndex in range(1, self.columns - 1):
-                if self.canMatch(rowIndex, columnIndex) \
-                   and self.canMatch(rowIndex, columnIndex - 1) \
-                   and self.canMatch(rowIndex, columnIndex + 1):
-                    blockType = self.blocks[rowIndex][columnIndex].blockType
-                    if self.matchesBlockType(rowIndex, columnIndex - 1, blockType) \
-                    and self.matchesBlockType(rowIndex, columnIndex + 1, blockType):
-                        matches.append(self.blocks[rowIndex][columnIndex])
-                        matches.append(self.blocks[rowIndex][columnIndex-1])
-                        matches.append(self.blocks[rowIndex][columnIndex+1])
+                block = self.blocks[rowIndex][columnIndex]
+                blocksToCompare = [block, self.blocks[rowIndex][columnIndex-1], self.blocks[rowIndex][columnIndex+1]]
+                if block and block.isMatchable() \
+                    and self.isMatchingBlock(rowIndex, columnIndex - 1, block) \
+                    and self.isMatchingBlock(rowIndex, columnIndex + 1, block):
+                    [x.match() for x in blocksToCompare]
+                    matches.extend(blocksToCompare)
             
         for rowIndex in range(1, self.rows - 1):
             for columnIndex in range(0, self.columns):
-                if self.canMatch(rowIndex, columnIndex) \
-                   and self.canMatch(rowIndex - 1, columnIndex) \
-                   and self.canMatch(rowIndex + 1, columnIndex):
-                    blockType = self.blocks[rowIndex][columnIndex].blockType
-                    #print("("+str(rowIndex)+","+str(columnIndex)+") checking vertically for colour " + str(colour))
-                    if self.matchesBlockType(rowIndex - 1, columnIndex, blockType) \
-                       and self.matchesBlockType(rowIndex + 1, columnIndex, blockType):
-                        matches.append(self.blocks[rowIndex][columnIndex])
-                        matches.append(self.blocks[rowIndex-1][columnIndex])
-                        matches.append(self.blocks[rowIndex+1][columnIndex])
+                block = self.blocks[rowIndex][columnIndex]
+                blocksToCompare = [block, self.blocks[rowIndex-1][columnIndex], self.blocks[rowIndex+1][columnIndex]]
+                if block and block.isMatchable() \
+                    and self.isMatchingBlock(rowIndex - 1, columnIndex, block) \
+                    and self.isMatchingBlock(rowIndex + 1, columnIndex, block):
+                    [x.match() for x in blocksToCompare]
+                    matches.extend(blocksToCompare)
         return matches
 
     def anyMatches(self):
@@ -403,7 +411,7 @@ while not game.done:
     # apply gravity
     for rowIndex in range(grid.rows - 2, -1, -1):
         for columnIndex in range(0, grid.columns):
-            if grid.canMatch(rowIndex, columnIndex) and grid.getBlock((rowIndex+1, columnIndex)) is None:
+            if grid.isMatchable(rowIndex, columnIndex) and grid.getBlock((rowIndex+1, columnIndex)) is None:
                 grid.getBlock((rowIndex, columnIndex)).fall()
                 grid.moveBlock((rowIndex, columnIndex), (rowIndex+1, columnIndex))
 
@@ -426,7 +434,6 @@ while not game.done:
         matches = grid.getMatches()
         for match in matches:
             game.score += 30
-            match.match()
 
     # remove blocks where removal animation has finished
     for rowIndex in range(0, grid.rows):
@@ -459,7 +466,7 @@ while not game.done:
                 targetBlockType = swapBlock.blockType
                 for rowIndex in range(0, grid.rows):
                     for columnIndex in range(0, grid.columns):
-                        if grid.canMatch(rowIndex, columnIndex):
+                        if grid.isMatchable(rowIndex, columnIndex):
                             if grid.getBlock((rowIndex, columnIndex)).blockType == targetBlockType:
                                 grid.getBlock((rowIndex, columnIndex)).match()
                 game.turns = game.turns - 1
