@@ -103,7 +103,7 @@ class Block:
     def matches(self, block):
         return block \
                and block.isMatchable() \
-               and block.blockType == block.blockType
+               and block.blockType == self.blockType
 
     def animate(self):
         if self.isMatched and not self.isGone:
@@ -207,28 +207,68 @@ class Grid:
                and blockAtLocation.isMatchable() \
                and blockAtLocation.blockType == block.blockType
 
+    def getBlocks(self, coordinateArray):
+        blocks = []
+        for coordinate in coordinateArray:
+            if (coordinate[0] >= 0 and coordinate[0] < self.rows) \
+                and (coordinate[1] >= 0 \
+                     and coordinate[1] < self.columns):
+                blocks.append(self.blocks[coordinate[0]][coordinate[1]])
+            else:
+                return None;
+        return blocks
+    
+    def threeHorizontalMatchPattern(self, rowIndex, columnIndex):
+        return self.getBlocks([[rowIndex, columnIndex+1], [rowIndex, columnIndex+2]])
+
+    def fourHorizontalMatchPattern(self, rowIndex, columnIndex):
+        return self.getBlocks([[rowIndex, columnIndex+1], [rowIndex, columnIndex+2], [rowIndex, columnIndex+3]])
+
+    def fiveHorizontalMatchPattern(self, rowIndex, columnIndex):
+        return self.getBlocks([[rowIndex, columnIndex+1],
+                               [rowIndex, columnIndex+2],
+                               [rowIndex, columnIndex+3],
+                               [rowIndex, columnIndex+4]
+                               ])
+
+    def threeVerticalMatchPattern(self, rowIndex, columnIndex):
+        return self.getBlocks([[rowIndex+1, columnIndex], [rowIndex+2, columnIndex]])
+
+    def fourVerticalMatchPattern(self, rowIndex, columnIndex):
+        return self.getBlocks([[rowIndex+1, columnIndex], [rowIndex+2, columnIndex], [rowIndex+3, columnIndex]])
+
+    def fiveVerticalMatchPattern(self, rowIndex, columnIndex):
+        return self.getBlocks([[rowIndex+1, columnIndex],
+                               [rowIndex+2, columnIndex],
+                               [rowIndex+3, columnIndex],
+                               [rowIndex+4, columnIndex]
+                               ])
+
+    def fourSquareMatchPattern(self, rowIndex, columnIndex):
+        return self.getBlocks([[rowIndex, columnIndex+1], [rowIndex+1, columnIndex+1], [rowIndex+1, columnIndex]])
+
     def getMatches(self):
         matches = []
+        self.findMatches(matches, self.fiveHorizontalMatchPattern)
+        self.findMatches(matches, self.fiveVerticalMatchPattern)    
+        self.findMatches(matches, self.fourSquareMatchPattern)
+        self.findMatches(matches, self.fourHorizontalMatchPattern)
+        self.findMatches(matches, self.fourVerticalMatchPattern)    
+        self.findMatches(matches, self.threeHorizontalMatchPattern)
+        self.findMatches(matches, self.threeVerticalMatchPattern)    
+        return matches
+
+    def findMatches(self, matches, matchStrategy):
         for rowIndex in range(0, self.rows):
-            for columnIndex in range(1, self.columns - 1):
-                block = self.blocks[rowIndex][columnIndex]
-                blocksToCompare = [block, self.blocks[rowIndex][columnIndex-1], self.blocks[rowIndex][columnIndex+1]]
-                if block and block.isMatchable() \
-                    and self.isMatchingBlock(rowIndex, columnIndex - 1, block) \
-                    and self.isMatchingBlock(rowIndex, columnIndex + 1, block):
-                    [x.match() for x in blocksToCompare]
-                    matches.extend(blocksToCompare)
-            
-        for rowIndex in range(1, self.rows - 1):
             for columnIndex in range(0, self.columns):
                 block = self.blocks[rowIndex][columnIndex]
-                blocksToCompare = [block, self.blocks[rowIndex-1][columnIndex], self.blocks[rowIndex+1][columnIndex]]
-                if block and block.isMatchable() \
-                    and self.isMatchingBlock(rowIndex - 1, columnIndex, block) \
-                    and self.isMatchingBlock(rowIndex + 1, columnIndex, block):
-                    [x.match() for x in blocksToCompare]
-                    matches.extend(blocksToCompare)
-        return matches
+                blocksToCompare = matchStrategy(rowIndex, columnIndex)
+                if block \
+                        and block.isMatchable() \
+                        and blocksToCompare \
+                        and all(block.matches(otherBlock) for otherBlock in blocksToCompare):
+                    [x.match() for x in [*blocksToCompare, block]]
+                    matches.extend([*blocksToCompare, block])
 
     def anyMatches(self):
         return len(self.getMatches()) > 0
