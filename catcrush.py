@@ -1,66 +1,19 @@
 import pygame
-import random
 import os
+from Block import Block
+from TextButton import TextButton
+from GraphicalToggleButton import GraphicalToggleButton
+from Grid import Grid
+from Game import Game
+from data import COLOURS
+from data import IMAGES
 
 _image_library = {}
-
-BLOCKTYPES = [
-    'NONE',
-    'RED',
-    'GREEN',
-    'BLUE',
-    'YELLOW',
-    'CYAN',
-    'MAGENTA',
-    'FISH',
-    'CHICKEN'
-    ]
-
-COLOURS = {
-    'NONE':(0, 0, 0),
-    'RED':(255, 0, 0),
-    'GREEN':(0, 255, 0),
-    'BLUE':(0, 0, 255),
-    'YELLOW':(0, 255, 255),
-    'CYAN':(255, 255, 0),
-    'MAGENTA':(255, 0, 255),
-    'FISH':(100, 100, 100),
-    'CHICKEN':(100, 100, 100)
-    }
-
-IMAGES = {
-    'NONE':'',
-    'RED':'cat1.jpg',
-    'GREEN':'cat2.jpg',
-    'BLUE':'cat3.jpg',
-    'YELLOW':'cat4.jpg',
-    'CYAN':'cat5.jpg',
-    'MAGENTA':'cat6.jpg',
-    'FISH':'fish.jpg',
-    'CHICKEN':'chicken.jpg'
-    }
-
-PHRASES = [
-    #'',
-    'GIVE ME FUDZ',
-    'I WANT CANDY NOT',
-    'BAD KITTY',
-    'meow (food)'
-    ]
-
-GAME_OVER_PHRASES = [
-    '',
-    'GAME OVAZ',
-    'YOU IS BAD AT THIS'
-    ]
 
 def load_sound(sound_filename, directory):
     fullname = os.path.join(directory, sound_filename)
     sound = pygame.mixer.Sound(fullname)
     return sound
-
-def getRandomBlockType():
-    return random.choice(BLOCKTYPES[1:7])
 
 def attract_mode():
     for x in range(0, 5):
@@ -71,278 +24,12 @@ def getImage(path, scale):
     global _image_library
     scaled_image = _image_library.get(path)
     if scaled_image == None:
-        full_path = rootFolder + path
+        full_path = rootFolder + 'images/' + path
         canonicalized_path = full_path.replace('/', os.sep)
         image = pygame.image.load(canonicalized_path)
         scaled_image = pygame.transform.scale(image, (scale[0], scale[1]))
         _image_library[path] = scaled_image
     return scaled_image
-
-class Block:
-    '''Represents a colour block'''
-
-    isMatched = False
-    isGone = False
-    isFalling = False
-    animationFrame = 1
-    fallCount = 0
-    
-    def __init__(self, blockType):
-        self.blockType = blockType
-
-    def match(self):
-        self.isMatched = True
-
-    def fall(self):
-        self.isFalling = True
-        self.fallCount = 100
-
-    def isMatchable(self):
-        return not self.isMatched and not self.isFalling
-    
-    def matches(self, block):
-        return block \
-               and block.isMatchable() \
-               and block.blockType == self.blockType
-
-    def animate(self):
-        if self.isMatched and not self.isGone:
-            self.animationFrame = self.animationFrame + 1
-        if self.animationFrame >= 5:
-            self.isGone = True
-        if self.isFalling:
-            self.fallCount = self.fallCount - 20
-            if self.fallCount <= 0:
-                self.isFalling = False
-                self.isFalling = 0
-
-class TextButton:
-    '''Simple text button'''
-
-    def __init__(self, text, position, size):
-        self.text = text
-        self.position = position
-        self.size = size
-        self.rect = pygame.Rect(position, size)
-
-    def collidepoint(self, point):
-        return self.rect.collidepoint(point)        
-
-    def draw(self, screen):
-        pygame.draw.rect(screen, (150, 150, 150), self.rect)
-        textSurface = myfont.render(self.text, False, (250, 250, 250))
-        screen.blit(textSurface, self.position)
-
-class GraphicalToggleButton:
-    '''Simple graphical toggle button'''
-
-    def __init__(self, imageOn, imageOff, position, size):
-        self.imageOn = getImage(imageOn, size)
-        self.imageOff = getImage(imageOff, size)
-        self.position = position
-        self.size = size
-        self.rect = pygame.Rect(position, size)
-        self.on = True
-
-    def collidepoint(self, point):
-        if self.rect.collidepoint(point):
-            self.on = not self.on
-            return True
-        return False
-
-    def draw(self, screen):
-        pygame.draw.rect(screen, (150, 150, 150), self.rect)
-        if self.on == True:
-            screen.blit(self.imageOn, self.position)
-        else:
-            screen.blit(self.imageOff, self.position)
-        
-class Grid:
-    '''Represents a grid of colour blocks'''
-
-    rows = 0
-    columns = 0
-    blocks = []
-
-    def __init__(self, rows, columns):
-        self.rows = rows
-        self.columns = columns
-        for x in range(0, rows):
-            blockrow = []
-            for y in range(0, columns):
-                blockrow.append(Block(getRandomBlockType()))
-            self.blocks.append(blockrow)
-
-    def isMatchable(self, row, column):
-        return not self.blocks[row][column] is None \
-               and self.blocks[row][column].isMatchable
-
-    def getBlock(self, position):
-        return self.blocks[position[0]][position[1]]
-
-    def setBlock(self, position, block):
-        self.blocks[position[0]][position[1]] = block
-
-    def moveBlock(self, sourcePosition, targetPosition):
-        block = self.getBlock(sourcePosition)
-        self.setBlock(targetPosition, block)
-        self.setBlock(sourcePosition, None)
-
-    def swapBlocks(self, sourcePosition, swapPosition):
-        sourceBlock = self.getBlock(sourcePosition)
-        swapBlock = self.getBlock(swapPosition)
-        self.setBlock(sourcePosition, swapBlock)
-        self.setBlock(swapPosition, sourceBlock)
-
-    def removeBlock(self, position):
-        self.setBlock(position, None)
-
-    def matchesBlockType(self, row, column, blockType):
-        return not self.blocks[row][column] is None \
-               and self.blocks[row][column].blockType == blockType
-
-    def isMatchingBlock(self, row, column, block):
-        blockAtLocation = self.blocks[row][column]
-        return blockAtLocation \
-               and blockAtLocation.isMatchable() \
-               and blockAtLocation.blockType == block.blockType
-
-    def getBlocks(self, coordinateArray):
-        blocks = []
-        for coordinate in coordinateArray:
-            if (coordinate[0] >= 0 and coordinate[0] < self.rows) \
-                and (coordinate[1] >= 0 \
-                     and coordinate[1] < self.columns):
-                blocks.append(self.blocks[coordinate[0]][coordinate[1]])
-            else:
-                return None;
-        return blocks
-    
-    def threeHorizontalMatchPattern(self, rowIndex, columnIndex):
-        return self.getBlocks([[rowIndex, columnIndex+1], [rowIndex, columnIndex+2]])
-
-    def fourHorizontalMatchPattern(self, rowIndex, columnIndex):
-        return self.getBlocks([[rowIndex, columnIndex+1], [rowIndex, columnIndex+2], [rowIndex, columnIndex+3]])
-
-    def fiveHorizontalMatchPattern(self, rowIndex, columnIndex):
-        return self.getBlocks([[rowIndex, columnIndex+1],
-                               [rowIndex, columnIndex+2],
-                               [rowIndex, columnIndex+3],
-                               [rowIndex, columnIndex+4]
-                               ])
-
-    def threeVerticalMatchPattern(self, rowIndex, columnIndex):
-        return self.getBlocks([[rowIndex+1, columnIndex], [rowIndex+2, columnIndex]])
-
-    def fourVerticalMatchPattern(self, rowIndex, columnIndex):
-        return self.getBlocks([[rowIndex+1, columnIndex], [rowIndex+2, columnIndex], [rowIndex+3, columnIndex]])
-
-    def fiveVerticalMatchPattern(self, rowIndex, columnIndex):
-        return self.getBlocks([[rowIndex+1, columnIndex],
-                               [rowIndex+2, columnIndex],
-                               [rowIndex+3, columnIndex],
-                               [rowIndex+4, columnIndex]
-                               ])
-
-    def fourSquareMatchPattern(self, rowIndex, columnIndex):
-        return self.getBlocks([[rowIndex, columnIndex+1], [rowIndex+1, columnIndex+1], [rowIndex+1, columnIndex]])
-
-    def getMatches(self):
-        matches = []
-        self.findMatches(matches, self.fiveHorizontalMatchPattern)
-        self.findMatches(matches, self.fiveVerticalMatchPattern)    
-        self.findMatches(matches, self.fourSquareMatchPattern)
-        self.findMatches(matches, self.fourHorizontalMatchPattern)
-        self.findMatches(matches, self.fourVerticalMatchPattern)    
-        self.findMatches(matches, self.threeHorizontalMatchPattern)
-        self.findMatches(matches, self.threeVerticalMatchPattern)    
-        return matches
-
-    def findMatches(self, matches, matchStrategy):
-        for rowIndex in range(0, self.rows):
-            for columnIndex in range(0, self.columns):
-                block = self.blocks[rowIndex][columnIndex]
-                blocksToCompare = matchStrategy(rowIndex, columnIndex)
-                if block \
-                        and block.isMatchable() \
-                        and blocksToCompare \
-                        and all(block.matches(otherBlock) for otherBlock in blocksToCompare):
-                    [x.match() for x in [*blocksToCompare, block]]
-                    matches.extend([*blocksToCompare, block])
-
-    def anyMatches(self):
-        return len(self.getMatches()) > 0
-
-    def clear(self):
-        for rowIndex in range(0, self.rows):
-            for columnIndex in range(0, self.columns):
-                self.blocks[rowIndex][columnIndex] = None
-
-    def inBounds(self, position):
-        return position[0] >= 0 \
-               and position[0] < self.rows \
-               and position[1] >= 0 \
-               and position[1] < self.columns
-
-class Game:
-    '''Defines all game switches and values'''
-    def __init__(self):
-        # no init
-        print('Init')
-
-    def reset(self):
-        self.done = False
-        self.score = 0
-        self.allowMatch = True
-        self.selected = None
-        self.swap = None
-        self.phraseCounter = 0
-        self.phrase = ''
-        self.turns = 20
-        self.gameOver = False
-        self.matchCount = 0
-        self.fishServed = False
-        self.chickenServed = False
-        self.isEatingChicken = False
-        self.eatChickenTimer = 0
-
-    def tick(self):
-        self.phraseCounter += 1
-        if self.phraseCounter == 500:
-            if (self.gameOver):
-                self.phrase = random.choice(GAME_OVER_PHRASES)
-            else:
-                self.phrase = random.choice(PHRASES)
-                self.phraseCounter = 0
-        if self.eatChickenTimer > 0:
-            self.eatChickenTimer -= 1
-        elif self.isEatingChicken == True:
-            self.isEatingChicken = False
-            self.setPhrase('')
-
-    def isTimeToServeFish(self):
-        return self.matchCount == 10 and not self.fishServed
-
-    def isTimeToServeChicken(self):
-        return self.matchCount == 15 and not self.chickenServed
-
-    def serveFish(self):
-        self.setPhrase('DO WANT FISH')
-        self.fishServed = True
-        
-    def serveChicken(self):
-        self.setPhrase('GIVE CHICKEN NOWS!!1')
-        self.chickenServed = True
-        
-    def setPhrase(self, phrase):
-        print(phrase)
-        self.phrase = phrase
-        self.phraseCounter = 0
-
-    def eatChicken(self):
-        self.isEatingChicken = True
-        self.eatChickenTimer = 50
-        self.setPhrase('NOM NOM NOM')
 
 def meow():
     if sound == True:
@@ -354,11 +41,11 @@ pygame.font.init()
 screen = pygame.display.set_mode((800, 600))
 clock = pygame.time.Clock()
 rootFolder = './'
-meowSound = load_sound("cat.wav", rootFolder)
+meowSound = load_sound("sounds/cat.wav", rootFolder)
 myfont = pygame.font.SysFont('AlphaFridgeMagnets', 30)
 sound = True
-restartButton = TextButton('RESTART', (550, 500), (110, 40))
-soundToggleButton = GraphicalToggleButton('sound_on.png', 'sound_off.png', (700, 500), (40, 40))
+restartButton = TextButton('RESTART', (550, 500), (110, 40), myfont)
+soundToggleButton = GraphicalToggleButton(getImage('sound_on.png', (40, 40)), getImage('sound_off.png', (40, 40)), (700, 500), (40, 40))
 game = Game()
 
 # start new game
@@ -392,7 +79,6 @@ while not game.done:
                     pygame.draw.rect(screen, (255, 255, 255, 100), pygame.Rect(x+xoffset, y+yoffset, frameSize, frameSize))
                 elif game.swap == (rowIndex, columnIndex):
                     pygame.draw.rect(screen, (200, 200, 200, 100), pygame.Rect(x+xoffset, y+yoffset, frameSize, frameSize))
-
 
     game.tick()
 
@@ -465,7 +151,7 @@ while not game.done:
                 newBlock = Block('CHICKEN')
                 game.serveChicken()
             else:    
-                newBlock = Block(getRandomBlockType())
+                newBlock = Block(grid.getRandomBlockType())
             grid.setBlock((0, columnIndex), newBlock)
             newBlock.fall()
 
